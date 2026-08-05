@@ -1,1 +1,0 @@
-{"root":["./src/app.tsx","./src/main.tsx","./src/layouts/dashboardlayout.tsx","./src/lib/actions.ts","./src/lib/api.ts","./src/lib/auth.ts","./src/lib/endpoints.ts","./src/lib/types.ts","./src/lib/usefetch.ts","./src/pages/campaigns.tsx","./src/pages/currencies.tsx","./src/pages/customers.tsx","./src/pages/dashboard.tsx","./src/pages/login.tsx"],"version":"5.9.3"}

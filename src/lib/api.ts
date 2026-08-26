@@ -1,28 +1,15 @@
 import axios, { AxiosError } from 'axios'
-import { getToken, clearAuth } from './auth'
+
+const API_KEY = import.meta.env.VITE_API_KEY || 'gyhewd8x34y87ddsyn9738t94587rfybds09t478fts7ndyr7yfd0gyn7t'
 
 const api = axios.create({
-  baseURL: '/api',
-  headers: { 'Content-Type': 'application/json' },
-})
-
-api.interceptors.request.use((config) => {
-  const token = getToken()
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`
-  }
-  return config
+  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:3003',
+  headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY },
 })
 
 api.interceptors.response.use(
   (res) => res,
   (error: AxiosError) => {
-    if (error.response?.status === 401) {
-      clearAuth()
-      if (!window.location.pathname.startsWith('/login')) {
-        window.location.href = '/login'
-      }
-    }
     return Promise.reject(error)
   },
 )

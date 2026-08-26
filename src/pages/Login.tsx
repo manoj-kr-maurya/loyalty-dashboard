@@ -19,6 +19,10 @@ export default function Login() {
 
   async function sendOtp(e: React.FormEvent) {
     e.preventDefault()
+    if (phoneNumber.length < 10) {
+      setError('Please enter a valid 10-digit phone number')
+      return
+    }
     setError('')
     setLoading(true)
     try {
@@ -67,18 +71,22 @@ export default function Login() {
           <form onSubmit={sendOtp} className="space-y-4">
             <div>
               <label className="label">Phone number</label>
-              <div className="flex gap-2">
+              <div className="flex items-stretch gap-2">
+                <div className="flex items-center rounded-lg border border-slate-300 bg-slate-50 px-3 text-slate-500">
+                  <span className="text-base font-medium">+</span>
+                  <input
+                    className="h-full w-10 border-none bg-transparent text-center text-base text-slate-900 outline-none"
+                    value={countryCode}
+                    onChange={(e) => setCountryCode(e.target.value)}
+                    placeholder="91"
+                    maxLength={4}
+                  />
+                </div>
                 <input
-                  className="input w-20"
-                  value={countryCode}
-                  onChange={(e) => setCountryCode(e.target.value)}
-                  placeholder="+91"
-                />
-                <input
-                  className="input flex-1"
+                  className="input flex-1 text-base text-slate-900"
                   value={phoneNumber}
                   onChange={(e) => setPhoneNumber(e.target.value)}
-                  placeholder="10-digit number"
+                  placeholder="Enter 10-digit number"
                   inputMode="numeric"
                   required
                 />
@@ -87,14 +95,14 @@ export default function Login() {
             <div>
               <label className="label">Organization name (new orgs only)</label>
               <input
-                className="input"
+                className="input text-base text-slate-900"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g. My Store"
               />
             </div>
             {error && <p className="text-sm text-red-600">{error}</p>}
-            <button className="btn-primary w-full" disabled={loading || phoneNumber.length < 10}>
+            <button className="btn-primary w-full" disabled={loading}>
               {loading ? 'Sending OTP…' : 'Send OTP'}
             </button>
           </form>
@@ -106,10 +114,10 @@ export default function Login() {
             <div>
               <label className="label">OTP</label>
               <input
-                className="input tracking-widest"
+                className="input text-base tracking-widest text-slate-900"
                 value={otp}
                 onChange={(e) => setOtp(e.target.value)}
-                placeholder="••••••"
+                placeholder="Enter OTP"
                 required
               />
             </div>

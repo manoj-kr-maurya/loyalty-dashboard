@@ -1,35 +1,10 @@
 import { Coins, Megaphone, Users, Wallet } from 'lucide-react'
-import { Link } from 'react-router-dom'
 import { fetchCampaigns, fetchCurrencyBuckets, fetchCustomers, fetchOrganization } from '../lib/endpoints'
 import { setOrg } from '../lib/auth'
 import { useFetch } from '../lib/useFetch'
+import { StatCard } from '../components/StatCard'
+import { StatCardSkeleton, CardSkeleton } from '../components/Skeletons'
 import type { Campaign, CurrencyBucket, Customer, Organization } from '../lib/types'
-
-function StatCard({
-  label,
-  value,
-  icon: Icon,
-  tone,
-  to,
-}: {
-  label: string
-  value: string | number
-  icon: typeof Coins
-  tone: string
-  to: string
-}) {
-  return (
-    <Link to={to} className="card flex items-center gap-4 transition-shadow hover:shadow">
-      <span className={`flex h-12 w-12 items-center justify-center rounded-xl ${tone}`}>
-        <Icon className="h-6 w-6" />
-      </span>
-      <div>
-        <p className="text-sm text-slate-500">{label}</p>
-        <p className="text-2xl font-semibold text-slate-900">{value}</p>
-      </div>
-    </Link>
-  )
-}
 
 export default function Dashboard() {
   const orgFetch = useFetch<{ organization: Organization }>(async () => {
@@ -50,7 +25,21 @@ export default function Dashboard() {
   const totalDistributed = buckets.reduce((sum, b) => sum + (b.distributedAmount ?? 0), 0)
 
   if (orgFetch.loading) {
-    return <p className="text-slate-500">Loading…</p>
+    return (
+      <div className="space-y-6">
+        <div className="space-y-2">
+          <div className="h-8 w-64 animate-pulse rounded bg-slate-200" />
+          <div className="h-4 w-80 animate-pulse rounded bg-slate-200" />
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => <StatCardSkeleton key={i} />)}
+        </div>
+        <div className="grid gap-6 lg:grid-cols-2">
+          <CardSkeleton />
+          <CardSkeleton />
+        </div>
+      </div>
+    )
   }
 
   return (

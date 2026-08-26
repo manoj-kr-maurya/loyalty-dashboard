@@ -1,12 +1,14 @@
-import { LayoutDashboard, Coins, Megaphone, Users, LogOut } from 'lucide-react'
+import { LayoutDashboard, Coins, Megaphone, Users, Tag, LogOut } from 'lucide-react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { clearAuth, getOrg } from '../lib/auth'
+import { request } from '../lib/api'
 import type { Organization } from '../lib/types'
 
 const navItems = [
   { to: '/', label: 'Overview', icon: LayoutDashboard },
   { to: '/currencies', label: 'Currencies', icon: Coins },
   { to: '/campaigns', label: 'Campaigns', icon: Megaphone },
+  { to: '/promo-codes', label: 'Promo Codes', icon: Tag },
   { to: '/customers', label: 'Customers', icon: Users },
 ]
 
@@ -14,9 +16,13 @@ export default function DashboardLayout() {
   const navigate = useNavigate()
   const org = getOrg<Organization>()
 
-  function handleLogout() {
-    clearAuth()
-    navigate('/login')
+  async function handleLogout() {
+    try {
+      await request('post', '/organization/logout').catch(() => {})
+    } finally {
+      clearAuth()
+      navigate('/login')
+    }
   }
 
   return (

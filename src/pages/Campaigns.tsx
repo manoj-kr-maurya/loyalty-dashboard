@@ -4,6 +4,8 @@ import { useFetch } from '../lib/useFetch'
 import { fetchCampaigns } from '../lib/endpoints'
 import { createCampaign } from '../lib/actions'
 import { extractError } from '../lib/api'
+import { useToast } from '../components/Toast'
+import { TableSkeleton } from '../components/Skeletons'
 import type { Campaign } from '../lib/types'
 
 function statusOf(c: Campaign): { label: string; cls: string } {
@@ -24,14 +26,13 @@ export default function Campaigns() {
   const [endDate, setEndDate] = useState('')
   const [earningExpiresIn, setEarningExpiresIn] = useState(30)
   const [busy, setBusy] = useState(false)
-  const [msg, setMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
+  const { addToast } = useToast()
 
   const activeCount = useMemo(() => (campaigns ?? []).filter((c) => statusOf(c).label === 'Active').length, [campaigns])
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault()
     setBusy(true)
-    setMsg(null)
     try {
       await createCampaign({
         name,
@@ -41,11 +42,11 @@ export default function Campaigns() {
         endDate,
         earningExpiresIn,
       })
-      setMsg({ type: 'ok', text: 'Campaign created.' })
+      addToast('success', 'Campaign created.')
       setShowCreate(false)
       await refetch()
     } catch (err) {
-      setMsg({ type: 'err', text: extractError(err) })
+      addToast('error', extractError(err))
     } finally {
       setBusy(false)
     }
@@ -62,12 +63,6 @@ export default function Campaigns() {
           <Plus className="h-4 w-4" /> New campaign
         </button>
       </div>
-
-      {msg && (
-        <div className={`rounded-lg px-4 py-2 text-sm ${msg.type === 'ok' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
-          {msg.text}
-        </div>
-      )}
 
       {showCreate && (
         <form onSubmit={handleCreate} className="card grid gap-3 sm:grid-cols-2">
@@ -103,7 +98,7 @@ export default function Campaigns() {
       )}
 
       {loading ? (
-        <p className="text-slate-500">Loading…</p>
+        <TableSkeleton cols={6} rows={5} />
       ) : !campaigns?.length ? (
         <p className="text-slate-500">No campaigns yet.</p>
       ) : (

@@ -62,3 +62,36 @@ export interface Customer {
   isVerified?: boolean
   createdAt?: string
 }
+
+export interface Promo {
+  id: string
+  name: string
+  description?: string
+  rewardType: string
+  rewardCurrency?: string
+  status?: string
+  programType?: string
+  minBankAmount?: number | null
+  businessType?: string[]
+  maxClaimsPerUser?: number | null
+  maxClaimsTotal?: number | null
+  startDate?: string
+  endDate?: string
+  organizationId?: string
+  priority?: number
+  createdAt?: string
+  rules?: PromoRule[]
+}
+
+export interface PromoRule {
+  id?: string
+  programId?: string
+  name: string
+  rewardType: string
+  rewardMode: string
+  value: number
+  conditions: unknown
+  threshold?: number | null
+  ratioBase?: number | null
+  meta?: unknown
+}

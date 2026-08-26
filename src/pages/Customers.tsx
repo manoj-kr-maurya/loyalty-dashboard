@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Search } from 'lucide-react'
 import { useFetch } from '../lib/useFetch'
 import { fetchCustomers } from '../lib/endpoints'
+import { TableSkeleton } from '../components/Skeletons'
 import type { Customer } from '../lib/types'
 
 function toArray(data: unknown): Customer[] {
@@ -49,7 +50,7 @@ export default function Customers() {
       </div>
 
       {loading ? (
-        <p className="text-slate-500">Loading…</p>
+        <TableSkeleton cols={4} rows={5} />
       ) : filtered.length === 0 ? (
         <p className="text-slate-500">{customers.length === 0 ? 'No customers yet.' : 'No matches.'}</p>
       ) : (

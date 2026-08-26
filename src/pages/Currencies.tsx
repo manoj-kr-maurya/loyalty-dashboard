@@ -4,6 +4,8 @@ import { useFetch } from '../lib/useFetch'
 import { fetchCurrencyBuckets } from '../lib/endpoints'
 import { create, addBucketBalance } from '../lib/actions'
 import { extractError } from '../lib/api'
+import { useToast } from '../components/Toast'
+import { CardSkeleton } from '../components/Skeletons'
 import type { CurrencyBucket } from '../lib/types'
 
 export default function Currencies() {
@@ -13,23 +15,23 @@ export default function Currencies() {
   const [name, setName] = useState('')
   const [topUpTarget, setTopUpTarget] = useState('')
   const [topUpAmount, setTopUpAmount] = useState(0)
-  const [msg, setMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
   const [busy, setBusy] = useState(false)
+  const { addToast } = useToast()
 
   const totalAvailable = useMemo(() => (buckets ?? []).reduce((s, b) => s + b.availableAmount, 0), [buckets])
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault()
     setBusy(true)
-    setMsg(null)
     try {
       await create(currencyCode, name)
-      setMsg({ type: 'ok', text: 'Currency created.' })
+      addToast('success', 'Currency created.')
       setCurrencyCode('')
       setName('')
       setShowCreate(false)
+      await refetch()
     } catch (err) {
-      setMsg({ type: 'err', text: extractError(err) })
+      addToast('error', extractError(err))
     } finally {
       setBusy(false)
     }
@@ -38,14 +40,13 @@ export default function Currencies() {
   async function handleTopUp(e: React.FormEvent, bucket: CurrencyBucket) {
     e.preventDefault()
     setBusy(true)
-    setMsg(null)
     try {
       await addBucketBalance(bucket.code, topUpAmount)
-      setMsg({ type: 'ok', text: `Added ${topUpAmount} to ${bucket.code}` })
+      addToast('success', `Added ${topUpAmount} to ${bucket.code}`)
       topUpRef()
       await refetch()
     } catch (err) {
-      setMsg({ type: 'err', text: extractError(err) })
+      addToast('error', extractError(err))
     } finally {
       setBusy(false)
     }
@@ -68,12 +69,6 @@ export default function Currencies() {
         </button>
       </div>
 
-      {msg && (
-        <div className={`rounded-lg px-4 py-2 text-sm ${msg.type === 'ok' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
-          {msg.text}
-        </div>
-      )}
-
       {showCreate && (
         <form onSubmit={handleCreate} className="card space-y-3">
           <h2 className="text-lg font-semibold text-slate-900">New currency</h2>
@@ -90,7 +85,9 @@ export default function Currencies() {
       )}
 
       {loading ? (
-        <p className="text-slate-500">Loading…</p>
+        <div className="grid gap-4 md:grid-cols-2">
+          {Array.from({ length: 4 }).map((_, i) => <CardSkeleton key={i} />)}
+        </div>
       ) : !buckets?.length ? (
         <p className="text-slate-500">No currency buckets yet. Create one to get started.</p>
       ) : (

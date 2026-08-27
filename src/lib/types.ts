@@ -75,6 +75,11 @@ export interface Promo {
   businessType?: string[]
   maxClaimsPerUser?: number | null
   maxClaimsTotal?: number | null
+  couponValue?: number | null
+  minimumCartValue?: number | null
+  maxDiscountValue?: number | null
+  subTitle?: string | null
+  couponCode?: string | null
   startDate?: string
   endDate?: string
   organizationId?: string
@@ -94,4 +99,27 @@ export interface PromoRule {
   threshold?: number | null
   ratioBase?: number | null
   meta?: unknown
+}
+
+export interface CouponCode {
+  id: string
+  programId: string
+  code: string
+  isUserSpecific: boolean
+  customerId?: string | null
+  status: 'AVAILABLE' | 'BLOCKED' | 'CLAIMED' | 'EXPIRED' | 'REVOKED'
+  maxUses: number
+  usedCount: number
+  transactionRef?: string | null
+  generatedAt: string
+  claimedAt?: string | null
+  expiresAt?: string | null
+}
+
+export interface ValidateCodeResponse {
+  isValid: boolean
+  message: string
+  couponCode?: CouponCode
+  program?: Promo
+  discount?: number
 }

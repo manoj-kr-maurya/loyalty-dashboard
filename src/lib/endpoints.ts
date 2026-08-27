@@ -1,5 +1,5 @@
 import { request } from './api'
-import type { ApiResponse, Campaign, CurrencyBucket, Customer, MetaFlags, Organization, Promo, PromoRule } from './types'
+import type { ApiResponse, Campaign, CouponCode, CurrencyBucket, Customer, MetaFlags, Organization, Promo, PromoRule, ValidateCodeResponse } from './types'
 
 function getOrgId(): string {
   const org = JSON.parse(localStorage.getItem('loyalty_admin_org') || '{}')
@@ -105,4 +105,56 @@ export async function upsertPromoRules(id: string, rules: {
   meta?: unknown
 }[]) {
   return await request<PromoRule[]>('post', `/promo/${id}/rules`, { rules })
+}
+
+// ─── Coupon Code (Auto-generated) ─────────────────────────────
+
+export async function generateCouponCodes(programId: string, options: {
+  isUserSpecific?: boolean
+  count?: number
+  codeLength?: number
+  prefix?: string
+  customerId?: string
+  maxUses?: number
+  expiresAt?: string
+}) {
+  return await request<CouponCode[]>('post', '/promo/codes/generate', {
+    programId,
+    isUserSpecific: options.isUserSpecific ?? true,
+    count: options.count ?? 1,
+    codeLength: options.codeLength ?? 8,
+    prefix: options.prefix,
+    customerId: options.customerId,
+    maxUses: options.maxUses ?? 1,
+    expiresAt: options.expiresAt,
+  })
+}
+
+export async function validateCouponCode(code: string, options?: {
+  customerId?: string
+  cartValue?: number
+  cartCategories?: string[]
+  isBankOffer?: boolean
+}) {
+  return await request<ValidateCodeResponse>('post', '/promo/codes/validate', {
+    code,
+    ...options,
+  })
+}
+
+export async function allocateCouponCode(programId: string, customerId: string) {
+  return await request<CouponCode>('post', '/promo/codes/allocate', { programId, customerId })
+}
+
+export async function claimCouponCode(code: string, customerId: string, transactionRef?: string) {
+  return await request<CouponCode>('post', '/promo/codes/claim', { code, customerId, transactionRef })
+}
+
+export async function listCouponCodes(programId: string, customerId?: string) {
+  const qs = customerId ? `?customerId=${customerId}` : ''
+  return await request<CouponCode[]>('get', `/promo/codes/${programId}${qs}`)
+}
+
+export async function getCustomerCouponCode(programId: string, customerId: string) {
+  return await request<CouponCode>('get', `/promo/codes/${programId}/customer/${customerId}`)
 }

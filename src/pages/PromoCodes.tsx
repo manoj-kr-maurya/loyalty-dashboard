@@ -1,17 +1,19 @@
-import { useState } from 'react'
-import { Plus, Tag, Pencil, X, ChevronDown, ChevronUp } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Plus, Tag, Pencil, X, ChevronDown, ChevronUp, Key, Copy, Check } from 'lucide-react'
 import { useFetch } from '../lib/useFetch'
-import { fetchPromos, fetchPromoById, createPromo, updatePromo, upsertPromoRules } from '../lib/endpoints'
+import { fetchPromos, fetchPromoById, createPromo, updatePromo, upsertPromoRules, generateCouponCodes, listCouponCodes } from '../lib/endpoints'
 import { extractError } from '../lib/api'
 import { useToast } from '../components/Toast'
 import { TableSkeleton } from '../components/Skeletons'
-import type { Promo, PromoRule } from '../lib/types'
+import type { Promo, PromoRule, CouponCode } from '../lib/types'
 
 const REWARD_TYPES = [
   { value: 'DISCOUNT', label: 'Discount' },
   { value: 'CASHBACK', label: 'Cashback' },
   { value: 'POINTS', label: 'Points' },
   { value: 'COUPON', label: 'Coupon' },
+  { value: 'PERCENTAGE', label: 'Percentage' },
+  { value: 'BUNDLE', label: 'Bundle' },
   { value: 'GIFT', label: 'Gift' },
 ]
 
@@ -51,6 +53,13 @@ function formatDate(d?: string) {
   return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}T${pad(dt.getHours())}:${pad(dt.getMinutes())}`
 }
 
+function codeStatusCls(s: string) {
+  if (s === 'AVAILABLE') return 'bg-emerald-100 text-emerald-700'
+  if (s === 'CLAIMED') return 'bg-blue-100 text-blue-700'
+  if (s === 'BLOCKED') return 'bg-amber-100 text-amber-700'
+  return 'bg-slate-100 text-slate-600'
+}
+
 export default function PromoCodes() {
   const { data: promos, loading, refetch } = useFetch<Promo[]>(fetchPromos)
   const [showCreate, setShowCreate] = useState(false)
@@ -62,6 +71,10 @@ export default function PromoCodes() {
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [rewardType, setRewardType] = useState('DISCOUNT')
+  const [couponValue, setCouponValue] = useState<string>('')
+  const [minimumCartValue, setMinimumCartValue] = useState<string>('')
+  const [maxDiscountValue, setMaxDiscountValue] = useState<string>('')
+  const [subTitle, setSubTitle] = useState('')
   const [validFrom, setValidFrom] = useState('')
   const [validTo, setValidTo] = useState('')
   const [minBankAmount, setMinBankAmount] = useState<string>('')
@@ -70,19 +83,38 @@ export default function PromoCodes() {
   const [maxClaimsTotal, setMaxClaimsTotal] = useState<string>('')
   const [businessTypeInput, setBusinessTypeInput] = useState('')
   const [busy, setBusy] = useState(false)
+
+  const [couponType, setCouponType] = useState<'manual' | 'auto'>('manual')
+  const [isUserSpecific, setIsUserSpecific] = useState(true)
+  const [codeCount, setCodeCount] = useState<string>('5')
+  const [codeLength, setCodeLength] = useState<string>('8')
+  const [codePrefix, setCodePrefix] = useState('')
+
+  const [codes, setCodes] = useState<CouponCode[]>([])
+  const [codesLoading, setCodesLoading] = useState(false)
+  const [generatingCodes, setGeneratingCodes] = useState(false)
+  const [copiedCode, setCopiedCode] = useState<string | null>(null)
+
   const { addToast } = useToast()
 
   function resetForm() {
     setName(''); setDescription(''); setRewardType('DISCOUNT')
+    setCouponValue(''); setMinimumCartValue(''); setMaxDiscountValue(''); setSubTitle('')
     setValidFrom(''); setValidTo('')
     setMinBankAmount(''); setBusinessType([]); setBusinessTypeInput('')
     setMaxClaimsPerUser(''); setMaxClaimsTotal(''); setRules([])
+    setCouponType('manual'); setIsUserSpecific(true)
+    setCodeCount('5'); setCodeLength('8'); setCodePrefix('')
   }
 
   function loadFormFromPromo(p: Promo) {
     setName(p.name)
     setDescription(p.description ?? '')
     setRewardType(p.rewardType)
+    setCouponValue(p.couponValue != null ? String(p.couponValue) : '')
+    setMinimumCartValue(p.minimumCartValue != null ? String(p.minimumCartValue) : '')
+    setMaxDiscountValue(p.maxDiscountValue != null ? String(p.maxDiscountValue) : '')
+    setSubTitle(p.subTitle ?? '')
     setValidFrom(formatDate(p.startDate))
     setValidTo(formatDate(p.endDate))
     setMinBankAmount(p.minBankAmount != null ? String(p.minBankAmount) : '')
@@ -95,7 +127,12 @@ export default function PromoCodes() {
     const org = JSON.parse(localStorage.getItem('loyalty_admin_org') || '{}')
     return {
       organizationId: org.id ?? '',
-      name, description, rewardType, validFrom, validTo,
+      name, description, rewardType,
+      couponValue: couponValue ? Number(couponValue) : undefined,
+      minimumCartValue: minimumCartValue ? Number(minimumCartValue) : undefined,
+      maxDiscountValue: maxDiscountValue ? Number(maxDiscountValue) : undefined,
+      subTitle: subTitle || undefined,
+      validFrom, validTo,
       minBankAmount: minBankAmount ? Number(minBankAmount) : undefined,
       businessType: businessType.length ? businessType : undefined,
       maxClaimsPerUser: maxClaimsPerUser ? Number(maxClaimsPerUser) : undefined,
@@ -117,7 +154,10 @@ export default function PromoCodes() {
     e.preventDefault()
     setBusy(true)
     try {
-      await createPromo(buildPayload())
+      const promo = await createPromo(buildPayload())
+      if (couponType === 'auto') {
+        await generateCodesForPromo(promo.id)
+      }
       addToast('success', 'Promo created.')
       setShowCreate(false)
       resetForm()
@@ -171,14 +211,53 @@ export default function PromoCodes() {
   }
 
   async function toggleRules(p: Promo) {
-    if (expandedId === p.id) { setExpandedId(null); setDetailPromo(null); return }
+    if (expandedId === p.id) { setExpandedId(null); setDetailPromo(null); setCodes([]); return }
     try {
       const full = await fetchPromoById(p.id)
       setDetailPromo(full)
       setExpandedId(p.id)
+      loadCodes(p.id)
     } catch (err) {
       addToast('error', extractError(err))
     }
+  }
+
+  async function loadCodes(programId: string) {
+    setCodesLoading(true)
+    try {
+      const data = await listCouponCodes(programId)
+      setCodes(data)
+    } catch {
+      setCodes([])
+    } finally {
+      setCodesLoading(false)
+    }
+  }
+
+  async function generateCodesForPromo(programId: string) {
+    setGeneratingCodes(true)
+    try {
+      await generateCouponCodes(programId, {
+        isUserSpecific,
+        count: Number(codeCount) || 5,
+        codeLength: Number(codeLength) || 8,
+        prefix: codePrefix || undefined,
+      })
+      if (expandedId === programId) {
+        await loadCodes(programId)
+      }
+      addToast('success', 'Codes generated.')
+    } catch (err) {
+      addToast('error', extractError(err))
+    } finally {
+      setGeneratingCodes(false)
+    }
+  }
+
+  function copyCode(code: string) {
+    navigator.clipboard.writeText(code)
+    setCopiedCode(code)
+    setTimeout(() => setCopiedCode(null), 2000)
   }
 
   const activeCount = (promos ?? []).filter((p) => statusOf(p).label === 'Active').length
@@ -220,6 +299,22 @@ export default function PromoCodes() {
               </select>
             </div>
             <div>
+              <label className="label">Coupon Value</label>
+              <input className="input" type="number" min="0" step="0.01" value={couponValue} onChange={(e) => setCouponValue(e.target.value)} placeholder="e.g. 20 (% off)" />
+            </div>
+            <div>
+              <label className="label">Min Cart Value</label>
+              <input className="input" type="number" min="0" step="0.01" value={minimumCartValue} onChange={(e) => setMinimumCartValue(e.target.value)} placeholder="0.00" />
+            </div>
+            <div>
+              <label className="label">Max Discount Value</label>
+              <input className="input" type="number" min="0" step="0.01" value={maxDiscountValue} onChange={(e) => setMaxDiscountValue(e.target.value)} placeholder="e.g. 500" />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="label">Sub-title (shown in user app)</label>
+              <input className="input" value={subTitle} onChange={(e) => setSubTitle(e.target.value)} placeholder="e.g. Get 20% off on all products" />
+            </div>
+            <div>
               <label className="label">Min Bank Amount</label>
               <input className="input" type="number" min="0" step="0.01" value={minBankAmount} onChange={(e) => setMinBankAmount(e.target.value)} placeholder="0.00" />
             </div>
@@ -240,6 +335,49 @@ export default function PromoCodes() {
               <input className="input" type="number" min="1" step="1" value={maxClaimsTotal} onChange={(e) => setMaxClaimsTotal(e.target.value)} placeholder="Unlimited" />
             </div>
           </div>
+
+          <div>
+            <label className="label">Coupon Code Type</label>
+            <div className="flex gap-3">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="radio" name="couponType" value="manual" checked={couponType === 'manual'} onChange={() => setCouponType('manual')}
+                  className="h-4 w-4 text-brand-600" />
+                <span className="text-sm text-slate-700">Manual (user enters code)</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="radio" name="couponType" value="auto" checked={couponType === 'auto'} onChange={() => setCouponType('auto')}
+                  className="h-4 w-4 text-brand-600" />
+                <span className="text-sm text-slate-700">Auto-generated codes</span>
+              </label>
+            </div>
+          </div>
+
+          {couponType === 'auto' && (
+            <div className="rounded-lg border border-brand-200 bg-brand-50 p-4 space-y-3">
+              <div className="flex items-center gap-2 text-sm font-medium text-brand-700">
+                <Key className="h-4 w-4" /> Auto-generated Code Settings
+              </div>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={isUserSpecific} onChange={(e) => setIsUserSpecific(e.target.checked)}
+                    className="h-4 w-4 rounded text-brand-600" />
+                  <span className="text-sm text-slate-700">User-specific (assigned to one customer)</span>
+                </label>
+                <div>
+                  <label className="label">Number of codes</label>
+                  <input className="input" type="number" min="1" max="1000" value={codeCount} onChange={(e) => setCodeCount(e.target.value)} />
+                </div>
+                <div>
+                  <label className="label">Code length</label>
+                  <input className="input" type="number" min="4" max="16" value={codeLength} onChange={(e) => setCodeLength(e.target.value)} />
+                </div>
+              </div>
+              <div>
+                <label className="label">Prefix (optional)</label>
+                <input className="input" value={codePrefix} onChange={(e) => setCodePrefix(e.target.value.toUpperCase())} placeholder="e.g. DIWALI" maxLength={6} />
+              </div>
+            </div>
+          )}
 
           <div>
             <label className="label">Business Type</label>
@@ -314,6 +452,7 @@ export default function PromoCodes() {
                       <p className="font-medium text-slate-900">{p.name}</p>
                       <p className="text-xs text-slate-500">
                         {p.rewardType.replace(/_/g, ' ').toLowerCase()}
+                        {p.couponValue != null && ` · ₹${p.couponValue}`}
                         {p.startDate ? ` · ${new Date(p.startDate).toLocaleDateString()} – ${p.endDate ? new Date(p.endDate).toLocaleDateString() : '—'}` : ''}
                       </p>
                     </div>
@@ -324,15 +463,22 @@ export default function PromoCodes() {
                   </div>
                 </div>
                 {expanded && detailPromo && (
-                  <div className="border-t border-slate-100 bg-slate-50 px-4 py-3">
-                    {detailPromo.description && <p className="mb-2 text-sm text-slate-600">{detailPromo.description}</p>}
-                    <div className="mb-2 flex flex-wrap gap-3 text-xs text-slate-500">
+                  <div className="border-t border-slate-100 bg-slate-50 px-4 py-3 space-y-3">
+                    {detailPromo.description && <p className="text-sm text-slate-600">{detailPromo.description}</p>}
+                    {detailPromo.subTitle && <p className="text-xs text-slate-500 italic">{detailPromo.subTitle}</p>}
+                    <div className="flex flex-wrap gap-3 text-xs text-slate-500">
                       {detailPromo.minBankAmount != null && <span>Min Bank: ₹{detailPromo.minBankAmount}</span>}
+                      {detailPromo.minimumCartValue != null && <span>Min Cart: ₹{detailPromo.minimumCartValue}</span>}
+                      {detailPromo.maxDiscountValue != null && <span>Max Discount: ₹{detailPromo.maxDiscountValue}</span>}
                       {detailPromo.maxClaimsPerUser != null && <span>Per-user limit: {detailPromo.maxClaimsPerUser}</span>}
                       {detailPromo.maxClaimsTotal != null && <span>Total limit: {detailPromo.maxClaimsTotal}</span>}
                       {Array.isArray(detailPromo.businessType) && detailPromo.businessType.length > 0 && <span>Business: {detailPromo.businessType.join(', ')}</span>}
                     </div>
-                    <p className="mb-2 text-xs font-medium text-slate-500 uppercase">Rules</p>
+
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-medium text-slate-500 uppercase">Rules</p>
+                      <button className="text-sm text-brand-600 hover:underline" onClick={() => startEdit(detailPromo)}>Edit rules</button>
+                    </div>
                     {!detailPromo.rules?.length ? (
                       <p className="text-xs text-slate-400">No rules defined.</p>
                     ) : (
@@ -345,7 +491,53 @@ export default function PromoCodes() {
                         ))}
                       </div>
                     )}
-                    <button className="mt-2 text-sm text-brand-600 hover:underline" onClick={() => startEdit(p)}>Edit rules</button>
+
+                    <div className="border-t border-slate-200 pt-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-xs font-medium text-slate-500 uppercase flex items-center gap-1">
+                          <Key className="h-3 w-3" /> Coupon Codes ({codes.length})
+                        </p>
+                        <button className="btn-secondary text-xs py-1 px-2" onClick={() => generateCodesForPromo(p.id)} disabled={generatingCodes}>
+                          {generatingCodes ? 'Generating…' : '+ Generate codes'}
+                        </button>
+                      </div>
+                      {codesLoading ? (
+                        <p className="text-xs text-slate-400">Loading codes…</p>
+                      ) : codes.length === 0 ? (
+                        <p className="text-xs text-slate-400">No codes generated yet.</p>
+                      ) : (
+                        <div className="max-h-48 overflow-y-auto">
+                          <table className="w-full text-xs">
+                            <thead>
+                              <tr className="text-slate-400">
+                                <th className="text-left pb-1 font-medium">Code</th>
+                                <th className="text-left pb-1 font-medium">Type</th>
+                                <th className="text-left pb-1 font-medium">Customer</th>
+                                <th className="text-left pb-1 font-medium">Used</th>
+                                <th className="text-left pb-1 font-medium">Status</th>
+                                <th className="pb-1"></th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                              {codes.map((c) => (
+                                <tr key={c.id}>
+                                  <td className="py-1 font-mono font-medium text-slate-700">{c.code}</td>
+                                  <td className="py-1 text-slate-500">{c.isUserSpecific ? 'User-specific' : 'Blanket'}</td>
+                                  <td className="py-1 text-slate-500">{c.customerId ? c.customerId.slice(0, 8) + '…' : '—'}</td>
+                                  <td className="py-1 text-slate-500">{c.usedCount}/{c.maxUses}</td>
+                                  <td className="py-1"><span className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium ${codeStatusCls(c.status)}`}>{c.status}</span></td>
+                                  <td className="py-1 pl-2">
+                                    <button onClick={() => copyCode(c.code)} className="text-slate-400 hover:text-slate-600" title="Copy code">
+                                      {copiedCode === c.code ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>

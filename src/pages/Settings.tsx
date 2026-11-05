@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { Copy, Check, KeyRound, Plus, Trash2 } from 'lucide-react'
+import { Copy, Check, Eye, EyeOff, KeyRound, Plus, Trash2 } from 'lucide-react'
 import { useFetch } from '../lib/useFetch'
-import { fetchOrganization } from '../lib/endpoints'
+import { fetchOrganization, setLoginCredentials } from '../lib/endpoints'
 import { setOrg } from '../lib/auth'
 import { extractError } from '../lib/api'
 import { useToast } from '../components/Toast'
@@ -89,6 +89,97 @@ function OrgProfile() {
         />
       </div>
       <button className="btn-primary" disabled={busy}>{busy ? 'Saving…' : 'Save profile'}</button>
+    </form>
+  )
+}
+
+function LoginCredentials() {
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
+  const [confirm, setConfirm] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const { addToast } = useToast()
+
+  async function save(e: React.FormEvent) {
+    e.preventDefault()
+    if (password !== confirm) {
+      addToast('error', 'Passwords do not match.')
+      return
+    }
+    setBusy(true)
+    try {
+      await setLoginCredentials({ username, password })
+      addToast('success', 'Login credentials updated.')
+      setUsername('')
+      setPassword('')
+      setConfirm('')
+    } catch (err) {
+      addToast('error', extractError(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <form onSubmit={save} className="card space-y-4">
+      <div>
+        <h2 className="text-lg font-semibold text-slate-900">Login credentials</h2>
+        <p className="text-sm text-slate-500">
+          Set the username and password staff use to sign in. An OTP is still required after the password.
+        </p>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div>
+          <label className="label">Username</label>
+          <input
+            className="input"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            autoComplete="username"
+            required
+            minLength={3}
+          />
+        </div>
+        <div>
+          <label className="label">Password</label>
+          <div className="relative">
+            <input
+              className="input pr-11"
+              type={showPassword ? 'text' : 'password'}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoComplete="new-password"
+              required
+              minLength={8}
+            />
+            <button
+              type="button"
+              className="absolute inset-y-0 right-0 flex items-center px-3 text-slate-400 hover:text-slate-600"
+              onClick={() => setShowPassword((v) => !v)}
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+              tabIndex={-1}
+            >
+              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          </div>
+        </div>
+        <div>
+          <label className="label">Confirm password</label>
+          <input
+            className="input"
+            type={showPassword ? 'text' : 'password'}
+            value={confirm}
+            onChange={(e) => setConfirm(e.target.value)}
+            autoComplete="new-password"
+            required
+            minLength={8}
+          />
+        </div>
+      </div>
+      <button className="btn-primary" disabled={busy}>
+        {busy ? 'Saving…' : 'Save credentials'}
+      </button>
     </form>
   )
 }
@@ -258,6 +349,7 @@ export default function Settings() {
         <p className="mt-1 text-sm text-slate-500">Manage your organization profile and integration credentials.</p>
       </div>
       <OrgProfile />
+      <LoginCredentials />
       <ApiKeys />
       <p className="flex items-center gap-1 text-xs text-slate-400">
         <Plus className="h-3 w-3" /> Need webhooks? Configure them under the Webhooks page.

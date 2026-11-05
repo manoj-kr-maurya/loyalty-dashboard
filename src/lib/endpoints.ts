@@ -20,6 +20,33 @@ export async function verifyOrgOtp(payload: { id: string; otp: string }) {
   return res.data
 }
 
+export async function loginWithCredentials(payload: { username: string; password: string }) {
+  const res = await request<ApiResponse<{ challengeId: string }>>(
+    'post',
+    '/organization/auth/login',
+    payload,
+  )
+  return res.data
+}
+
+export async function verifyLoginChallenge(payload: { challengeId: string; otp: string }) {
+  const res = await request<ApiResponse<{ token: string; organization: Organization }>>(
+    'post',
+    '/organization/auth/verify-otp',
+    payload,
+  )
+  return res.data
+}
+
+export async function setLoginCredentials(payload: { username: string; password: string }) {
+  const res = await request<ApiResponse<Organization>>(
+    'post',
+    '/organization/auth/set-credentials',
+    payload,
+  )
+  return res.data
+}
+
 export async function fetchOrganization() {
   const res = await request<ApiResponse<{ organization: Organization; metaFlags: MetaFlags }>>(
     'get',

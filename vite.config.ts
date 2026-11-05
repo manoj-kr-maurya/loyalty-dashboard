@@ -6,6 +6,7 @@ import { resolve } from 'node:path'
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   const apiBase = env.VITE_API_BASE_URL || 'http://localhost:3003'
+  const port = Number(process.env.PORT) || 5173
 
   return {
     plugins: [react()],
@@ -15,7 +16,9 @@ export default defineConfig(({ mode }) => {
       },
     },
     server: {
-      port: 5173,
+      host: '0.0.0.0',
+      port,
+      allowedHosts: true,
       proxy: {
         '/api': {
           target: apiBase,
@@ -23,6 +26,11 @@ export default defineConfig(({ mode }) => {
           rewrite: (path) => path.replace(/^\/api/, ''),
         },
       },
+    },
+    preview: {
+      host: '0.0.0.0',
+      port,
+      allowedHosts: true,
     },
     test: {
       globals: true,

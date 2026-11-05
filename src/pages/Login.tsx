@@ -64,7 +64,7 @@ export default function Login() {
             L
           </div>
           <h1 className="text-xl font-semibold text-slate-900">Loyalty Engine</h1>
-          <p className="mt-1 text-sm text-slate-500">Organization admin dashboard</p>
+          <p className="mt-1 text-sm text-slate-500">Tenant dashboard</p>
         </div>
 
         {step === 'phone' ? (

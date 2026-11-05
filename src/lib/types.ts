@@ -63,6 +63,22 @@ export interface Customer {
   createdAt?: string
 }
 
+export interface TopCustomer {
+  customer_name: string | null
+  total_earned: number
+}
+
+export interface LoyaltyTier {
+  name: string
+  level: number
+  minPoints: number
+  maxPoints?: number
+  multiplier: number
+  benefits?: Record<string, unknown>
+  color?: string
+  iconUrl?: string
+}
+
 export interface Promo {
   id: string
   name: string
@@ -80,6 +96,8 @@ export interface Promo {
   maxDiscountValue?: number | null
   subTitle?: string | null
   couponCode?: string | null
+  attributes?: Record<string, any> | null
+  channels?: string[]
   startDate?: string
   endDate?: string
   organizationId?: string

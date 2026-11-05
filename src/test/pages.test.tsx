@@ -7,7 +7,7 @@ import Currencies from '../pages/Currencies'
 import Campaigns from '../pages/Campaigns'
 import Customers from '../pages/Customers'
 import { ToastProvider } from '../components/Toast'
-import type { CurrencyBucket, Campaign, Customer } from '../lib/types'
+import type { CurrencyBucket, Campaign, TopCustomer } from '../lib/types'
 
 // ── Mocks ─────────────────────────────────────────────────
 
@@ -20,7 +20,6 @@ vi.mock('../lib/endpoints', () => ({
 
 vi.mock('../lib/actions', () => ({
   create: vi.fn(),
-  addBucketBalance: vi.fn(),
   createCampaign: vi.fn(),
 }))
 
@@ -78,9 +77,9 @@ const sampleCampaigns: Campaign[] = [
   },
 ]
 
-const sampleCustomers: Customer[] = [
-  { id: 'u1', name: 'Alice', phoneNumber: '1234567890', countryCode: '91', isVerified: true, createdAt: '2024-01-15T10:00:00Z' },
-  { id: 'u2', name: 'Bob', phoneNumber: '9876543210', countryCode: '91', isVerified: false, createdAt: '2024-03-20T14:30:00Z' },
+const sampleCustomers: TopCustomer[] = [
+  { customer_name: 'Alice', total_earned: 5000 },
+  { customer_name: 'Bob', total_earned: 2000 },
 ]
 
 beforeEach(() => {
@@ -113,7 +112,7 @@ describe('Dashboard', () => {
     expect(screen.getByText('8,000')).toBeInTheDocument()
     expect(screen.getByText('Campaigns')).toBeInTheDocument()
     expect(screen.getByText('3')).toBeInTheDocument()
-    expect(screen.getByText('Customers')).toBeInTheDocument()
+    expect(screen.getByText('Top customers')).toBeInTheDocument()
   })
 
   it('shows currency buckets with progress bars', async () => {
@@ -242,7 +241,7 @@ describe('Campaigns', () => {
     expect(screen.getByText('Past Campaign')).toBeInTheDocument()
     expect(screen.getByText('Future Campaign')).toBeInTheDocument()
     expect(screen.getByRole('table')).toBeInTheDocument()
-    expect(screen.getAllByRole('columnheader')).toHaveLength(6)
+    expect(screen.getAllByRole('columnheader')).toHaveLength(7)
   })
 
   it('shows correct status badges (Active/Scheduled/Expired)', async () => {
@@ -331,45 +330,30 @@ describe('Customers', () => {
     expect(screen.getAllByRole('generic').filter((el) => el.className.includes('animate-pulse')).length).toBeGreaterThan(0)
   })
 
-  it('renders customer table', async () => {
+  it('renders top customer table', async () => {
     render(withProviders(<Customers />))
     await waitFor(() => {
       expect(screen.getByText('Alice')).toBeInTheDocument()
     })
     expect(screen.getByText('Bob')).toBeInTheDocument()
-    expect(screen.getByText('+91 1234567890')).toBeInTheDocument()
-    expect(screen.getByText('+91 9876543210')).toBeInTheDocument()
-    expect(screen.getAllByText('Verified').length).toBeGreaterThanOrEqual(1)
-    expect(screen.getByText('Unverified')).toBeInTheDocument()
-    expect(screen.getByText('2 customers.')).toBeInTheDocument()
+    expect(screen.getByText('5,000')).toBeInTheDocument()
+    expect(screen.getByText('2,000')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Top customers' })).toBeInTheDocument()
     expect(screen.getByRole('table')).toBeInTheDocument()
-    expect(screen.getAllByRole('columnheader')).toHaveLength(4)
+    expect(screen.getAllByRole('columnheader')).toHaveLength(3)
   })
 
-  it('filters customers by search query', async () => {
+  it('filters customers by name', async () => {
     render(withProviders(<Customers />))
     await waitFor(() => {
       expect(screen.getByText('Alice')).toBeInTheDocument()
     })
 
-    const searchInput = screen.getByPlaceholderText(/search by name or phone/i)
+    const searchInput = screen.getByPlaceholderText(/search by name/i)
     await userEvent.type(searchInput, 'Alice')
 
     expect(screen.getByText('Alice')).toBeInTheDocument()
     expect(screen.queryByText('Bob')).not.toBeInTheDocument()
-  })
-
-  it('filters by phone number', async () => {
-    render(withProviders(<Customers />))
-    await waitFor(() => {
-      expect(screen.getByText('Alice')).toBeInTheDocument()
-    })
-
-    const searchInput = screen.getByPlaceholderText(/search by name or phone/i)
-    await userEvent.type(searchInput, '98765')
-
-    expect(screen.queryByText('Alice')).not.toBeInTheDocument()
-    expect(screen.getByText('Bob')).toBeInTheDocument()
   })
 
   it('shows "No customers yet" when empty', async () => {
@@ -386,20 +370,8 @@ describe('Customers', () => {
       expect(screen.getByText('Alice')).toBeInTheDocument()
     })
 
-    const searchInput = screen.getByPlaceholderText(/search by name or phone/i)
+    const searchInput = screen.getByPlaceholderText(/search by name/i)
     await userEvent.type(searchInput, 'zzzzzzz')
-
-    expect(screen.getByText('No matches.')).toBeInTheDocument()
-  })
-
-  it('shows "No matches" but not "No customers yet" for non-empty filter miss', async () => {
-    render(withProviders(<Customers />))
-    await waitFor(() => {
-      expect(screen.getByText('Alice')).toBeInTheDocument()
-    })
-
-    const searchInput = screen.getByPlaceholderText(/search by name or phone/i)
-    await userEvent.type(searchInput, 'zzzzz')
 
     expect(screen.queryByText('No customers yet.')).not.toBeInTheDocument()
     expect(screen.getByText('No matches.')).toBeInTheDocument()

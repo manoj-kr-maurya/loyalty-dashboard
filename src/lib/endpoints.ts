@@ -1,5 +1,5 @@
 import { request } from './api'
-import type { ApiResponse, Campaign, CouponCode, CurrencyBucket, Customer, MetaFlags, Organization, Promo, PromoRule, ValidateCodeResponse } from './types'
+import type { ApiResponse, Campaign, CouponCode, CurrencyBucket, LoyaltyTier, MetaFlags, Organization, Promo, PromoRule, TopCustomer, ValidateCodeResponse } from './types'
 
 function getOrgId(): string {
   const org = JSON.parse(localStorage.getItem('loyalty_admin_org') || '{}')
@@ -45,16 +45,29 @@ export async function fetchCampaigns() {
 }
 
 export async function fetchCustomers() {
-  const res = await request<{ status: string; data: Customer[]; metadata?: unknown }>(
+  const res = await request<ApiResponse<TopCustomer[]>>(
     'get',
-    '/admin/fetch-all-customers',
+    `/customer/leader-board/top-customers?organizationId=${getOrgId()}`,
   )
-  return res.data
+  return res.data ?? []
+}
+
+export async function fetchTiers() {
+  return await request<LoyaltyTier[]>('get', `/engines/loyalty/tiers/${getOrgId()}`)
+}
+
+export async function upsertTiers(tiers: LoyaltyTier[]) {
+  const res = await request<{ organizationId: string; tiers: LoyaltyTier[] }>(
+    'post',
+    '/engines/loyalty/tiers',
+    { organizationId: getOrgId(), tiers },
+  )
+  return res.tiers
 }
 
 export async function fetchPromos() {
-  const res = await request<Promo[]>('get', `/promo/?organizationId=${getOrgId()}`)
-  return res
+  const res = await request<Promo[]>('get', `/promo/list?organizationId=${getOrgId()}`)
+  return res ?? []
 }
 
 export async function createPromo(payload: {
@@ -67,6 +80,8 @@ export async function createPromo(payload: {
   businessType?: string[]
   maxClaimsPerUser?: number
   maxClaimsTotal?: number
+  attributes?: Record<string, any>
+  channels?: string[]
 }) {
   const res = await request<Promo>('post', '/promo/create', {
     organizationId: getOrgId(),
@@ -90,6 +105,8 @@ export async function updatePromo(id: string, payload: {
   businessType?: string[]
   maxClaimsPerUser?: number
   maxClaimsTotal?: number
+  attributes?: Record<string, any>
+  channels?: string[]
 }) {
   return await request<Promo>('post', `/promo/${id}/update`, payload)
 }
@@ -157,4 +174,71 @@ export async function listCouponCodes(programId: string, customerId?: string) {
 
 export async function getCustomerCouponCode(programId: string, customerId: string) {
   return await request<CouponCode>('get', `/promo/codes/${programId}/customer/${customerId}`)
+}
+
+export async function couponCheck(payload: { couponCode: string; customerId?: string; cartValue: number }) {
+  return await request<unknown>('post', '/promo/coupon/check', { organizationId: getOrgId(), ...payload })
+}
+
+export async function couponBlock(payload: { couponCode: string; customerId: string }) {
+  return await request<unknown>('post', '/promo/coupon/block', { organizationId: getOrgId(), ...payload })
+}
+
+export async function couponRelease(payload: { couponCode: string; customerId: string }) {
+  return await request<unknown>('post', '/promo/coupon/release', { organizationId: getOrgId(), ...payload })
+}
+
+// ─── Currency buckets ────────────────────────────────────────
+
+export async function createCurrencyBucket(currencyCode: string) {
+  return await request<unknown>('post', '/currency/create-organization-currency-bucket', {
+    organizationId: getOrgId(),
+    currencyCode,
+  })
+}
+
+export async function updateCurrencyBucket(payload: {
+  id: string
+  autoTopUpEnabled: boolean
+  autoTopUpThreshold?: number
+  autoTopUpAmount?: number
+}) {
+  return await request<unknown>('post', '/currency/update-organization-currency-bucket', {
+    organizationId: getOrgId(),
+    ...payload,
+  })
+}
+
+export async function searchNonOrgCurrencies(substring: string) {
+  return await request<unknown>(
+    'get',
+    `/currency/search/non-organization/${encodeURIComponent(substring)}?organizationId=${getOrgId()}`,
+  )
+}
+
+// ─── Campaign update / potential earning ─────────────────────
+
+export async function updateCampaign(payload: {
+  id: string
+  name: string
+  earningPercentage: number
+  currencyCode: string
+  startDate: string
+  endDate: string
+  earningExpiresIn: number
+  isSoftDeleted?: boolean
+  force?: boolean
+}) {
+  return await request<unknown>('post', '/campaign/update-organization-level-campaign', {
+    organizationId: getOrgId(),
+    isSoftDeleted: false,
+    ...payload,
+  })
+}
+
+export async function potentialEarning(realAmount: number) {
+  return await request<unknown>('post', '/campaign/get-active-campaigns-potential-earning', {
+    organizationId: getOrgId(),
+    realAmount,
+  })
 }

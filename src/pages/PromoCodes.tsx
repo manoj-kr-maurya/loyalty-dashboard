@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Plus, Tag, Pencil, X, ChevronDown, ChevronUp, Key, Copy, Check } from 'lucide-react'
 import { useFetch } from '../lib/useFetch'
 import { fetchPromos, fetchPromoById, createPromo, updatePromo, upsertPromoRules, generateCouponCodes, listCouponCodes } from '../lib/endpoints'
@@ -32,6 +32,8 @@ const REWARD_TYPES_FOR_RULE = [
 ]
 
 const BUSINESS_TYPES = ['Retail', 'Food', 'Services', 'Electronics', 'Fashion', 'Healthcare', 'Education', 'Other']
+
+const CHANNELS = ['app', 'web', 'mweb']
 
 function statusOf(p: Promo): { label: string; cls: string } {
   if (p.status === 'PAUSED') return { label: 'Paused', cls: 'bg-amber-100 text-amber-700' }
@@ -79,16 +81,20 @@ export default function PromoCodes() {
   const [validTo, setValidTo] = useState('')
   const [minBankAmount, setMinBankAmount] = useState<string>('')
   const [businessType, setBusinessType] = useState<string[]>([])
+  const [channels, setChannels] = useState<string[]>([])
   const [maxClaimsPerUser, setMaxClaimsPerUser] = useState<string>('')
   const [maxClaimsTotal, setMaxClaimsTotal] = useState<string>('')
   const [businessTypeInput, setBusinessTypeInput] = useState('')
   const [busy, setBusy] = useState(false)
 
   const [couponType, setCouponType] = useState<'manual' | 'auto'>('manual')
+  const [manualCouponCode, setManualCouponCode] = useState('')
   const [isUserSpecific, setIsUserSpecific] = useState(true)
   const [codeCount, setCodeCount] = useState<string>('5')
   const [codeLength, setCodeLength] = useState<string>('8')
   const [codePrefix, setCodePrefix] = useState('')
+
+  const [attributes, setAttributes] = useState<Array<{ key: string; value: string }>>([])
 
   const [codes, setCodes] = useState<CouponCode[]>([])
   const [codesLoading, setCodesLoading] = useState(false)
@@ -102,9 +108,11 @@ export default function PromoCodes() {
     setCouponValue(''); setMinimumCartValue(''); setMaxDiscountValue(''); setSubTitle('')
     setValidFrom(''); setValidTo('')
     setMinBankAmount(''); setBusinessType([]); setBusinessTypeInput('')
+    setChannels([])
     setMaxClaimsPerUser(''); setMaxClaimsTotal(''); setRules([])
-    setCouponType('manual'); setIsUserSpecific(true)
+    setCouponType('manual'); setManualCouponCode(''); setIsUserSpecific(true)
     setCodeCount('5'); setCodeLength('8'); setCodePrefix('')
+    setAttributes([])
   }
 
   function loadFormFromPromo(p: Promo) {
@@ -119,8 +127,12 @@ export default function PromoCodes() {
     setValidTo(formatDate(p.endDate))
     setMinBankAmount(p.minBankAmount != null ? String(p.minBankAmount) : '')
     setBusinessType(Array.isArray(p.businessType) ? p.businessType : [])
+    setChannels(Array.isArray(p.channels) ? p.channels : [])
     setMaxClaimsPerUser(p.maxClaimsPerUser != null ? String(p.maxClaimsPerUser) : '')
     setMaxClaimsTotal(p.maxClaimsTotal != null ? String(p.maxClaimsTotal) : '')
+    setManualCouponCode(p.couponCode ?? '')
+    setCouponType(p.couponCode ? 'manual' : 'auto')
+    setAttributes(p.attributes ? Object.entries(p.attributes).map(([k, v]) => ({ key: k, value: String(v) })) : [])
   }
 
   function buildPayload() {
@@ -129,14 +141,19 @@ export default function PromoCodes() {
       organizationId: org.id ?? '',
       name, description, rewardType,
       couponValue: couponValue ? Number(couponValue) : undefined,
+      couponCode: couponType === 'manual' && manualCouponCode.trim() ? manualCouponCode.trim().toUpperCase() : undefined,
       minimumCartValue: minimumCartValue ? Number(minimumCartValue) : undefined,
       maxDiscountValue: maxDiscountValue ? Number(maxDiscountValue) : undefined,
       subTitle: subTitle || undefined,
       validFrom, validTo,
       minBankAmount: minBankAmount ? Number(minBankAmount) : undefined,
       businessType: businessType.length ? businessType : undefined,
+      channels: channels.length ? channels : undefined,
       maxClaimsPerUser: maxClaimsPerUser ? Number(maxClaimsPerUser) : undefined,
       maxClaimsTotal: maxClaimsTotal ? Number(maxClaimsTotal) : undefined,
+      attributes: attributes.filter((a) => a.key.trim()).length
+        ? Object.fromEntries(attributes.filter((a) => a.key.trim()).map((a) => [a.key.trim(), a.value]))
+        : undefined,
     }
   }
 
@@ -352,6 +369,14 @@ export default function PromoCodes() {
             </div>
           </div>
 
+          {couponType === 'manual' && (
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+              <label className="label">Manual Coupon Code</label>
+              <input className="input" value={manualCouponCode} onChange={(e) => setManualCouponCode(e.target.value.toUpperCase())}
+                placeholder="e.g. DIWALI20" maxLength={20} />
+            </div>
+          )}
+
           {couponType === 'auto' && (
             <div className="rounded-lg border border-brand-200 bg-brand-50 p-4 space-y-3">
               <div className="flex items-center gap-2 text-sm font-medium text-brand-700">
@@ -395,6 +420,37 @@ export default function PromoCodes() {
               ))}
               <input className="w-32 rounded-full border border-slate-200 px-3 py-1 text-xs outline-none focus:border-brand-500" value={businessTypeInput} onChange={(e) => setBusinessTypeInput(e.target.value)} placeholder="Custom..." onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addBusinessType(businessTypeInput) } }} />
             </div>
+          </div>
+
+          <div>
+            <label className="label">Channels (leave empty = all channels)</label>
+            <div className="flex flex-wrap gap-2">
+              {CHANNELS.map((ch) => {
+                const active = channels.includes(ch)
+                return (
+                  <button key={ch} type="button"
+                    onClick={() => setChannels(active ? channels.filter((c) => c !== ch) : [...channels, ch])}
+                    className={`rounded-full px-3 py-1 text-xs font-medium capitalize transition ${active ? 'bg-brand-600 text-white' : 'border border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
+                    {ch === 'mweb' ? 'Mobile web' : ch}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="label mb-0">Attributes (metadata key-value pairs)</label>
+              <button type="button" className="text-sm text-brand-600 hover:underline" onClick={() => setAttributes([...attributes, { key: '', value: '' }])}>+ Add attribute</button>
+            </div>
+            {attributes.length === 0 && <p className="text-xs text-slate-400">No attributes defined.</p>}
+            {attributes.map((a, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <input className="input flex-1" value={a.key} onChange={(e) => { const n = [...attributes]; n[i] = { ...n[i], key: e.target.value }; setAttributes(n) }} placeholder="Key (e.g. brand)" />
+                <input className="input flex-1" value={a.value} onChange={(e) => { const n = [...attributes]; n[i] = { ...n[i], value: e.target.value }; setAttributes(n) }} placeholder="Value (e.g. Nike)" />
+                <button type="button" className="text-slate-400 hover:text-red-500" onClick={() => setAttributes(attributes.filter((_, j) => j !== i))}><X className="h-4 w-4" /></button>
+              </div>
+            ))}
           </div>
 
           {editId && (
@@ -451,7 +507,7 @@ export default function PromoCodes() {
                     <div>
                       <p className="font-medium text-slate-900">{p.name}</p>
                       <p className="text-xs text-slate-500">
-                        {p.rewardType.replace(/_/g, ' ').toLowerCase()}
+                        {(p.rewardType ?? '').replace(/_/g, ' ').toLowerCase()}
                         {p.couponValue != null && ` · ₹${p.couponValue}`}
                         {p.startDate ? ` · ${new Date(p.startDate).toLocaleDateString()} – ${p.endDate ? new Date(p.endDate).toLocaleDateString() : '—'}` : ''}
                       </p>
@@ -473,7 +529,18 @@ export default function PromoCodes() {
                       {detailPromo.maxClaimsPerUser != null && <span>Per-user limit: {detailPromo.maxClaimsPerUser}</span>}
                       {detailPromo.maxClaimsTotal != null && <span>Total limit: {detailPromo.maxClaimsTotal}</span>}
                       {Array.isArray(detailPromo.businessType) && detailPromo.businessType.length > 0 && <span>Business: {detailPromo.businessType.join(', ')}</span>}
+                      {Array.isArray(detailPromo.channels) && detailPromo.channels.length > 0 && <span>Channels: {detailPromo.channels.map((c) => (c === 'mweb' ? 'mobile web' : c)).join(', ')}</span>}
                     </div>
+
+                    {detailPromo.attributes && typeof detailPromo.attributes === 'object' && Object.keys(detailPromo.attributes).length > 0 && (
+                      <div className="flex flex-wrap gap-2">
+                        {Object.entries(detailPromo.attributes).map(([k, v]) => (
+                          <span key={k} className="flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-0.5 text-xs text-slate-600">
+                            <span className="font-medium text-slate-700">{k}</span>: {String(v)}
+                          </span>
+                        ))}
+                      </div>
+                    )}
 
                     <div className="flex items-center justify-between">
                       <p className="text-xs font-medium text-slate-500 uppercase">Rules</p>

@@ -1,4 +1,20 @@
-import { LayoutDashboard, Coins, Megaphone, Users, Tag, LogOut } from 'lucide-react'
+import {
+  LayoutDashboard,
+  BarChart3,
+  Coins,
+  Megaphone,
+  Users,
+  Tag,
+  Ticket,
+  Award,
+  Gift,
+  Store,
+  Boxes,
+  Workflow,
+  Webhook,
+  Settings as SettingsIcon,
+  LogOut,
+} from 'lucide-react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { clearAuth, getOrg } from '../lib/auth'
 import { request } from '../lib/api'
@@ -6,10 +22,19 @@ import type { Organization } from '../lib/types'
 
 const navItems = [
   { to: '/', label: 'Overview', icon: LayoutDashboard },
+  { to: '/analytics', label: 'Analytics', icon: BarChart3 },
   { to: '/currencies', label: 'Currencies', icon: Coins },
   { to: '/campaigns', label: 'Campaigns', icon: Megaphone },
   { to: '/promo-codes', label: 'Promo Codes', icon: Tag },
+  { to: '/coupon-tools', label: 'Coupon Tools', icon: Ticket },
+  { to: '/tiers', label: 'Tiers', icon: Award },
+  { to: '/rewards', label: 'Rewards', icon: Gift },
   { to: '/customers', label: 'Customers', icon: Users },
+  { to: '/shops', label: 'Shops', icon: Store },
+  { to: '/orders', label: 'Orders', icon: Boxes },
+  { to: '/engines', label: 'Engines', icon: Workflow },
+  { to: '/webhooks', label: 'Webhooks', icon: Webhook },
+  { to: '/settings', label: 'Settings', icon: SettingsIcon },
 ]
 
 export default function DashboardLayout() {
@@ -18,7 +43,7 @@ export default function DashboardLayout() {
 
   async function handleLogout() {
     try {
-      await request('post', '/organization/logout').catch(() => {})
+      await request('post', '/organization/logout', { organizationId: org?.id }).catch(() => {})
     } finally {
       clearAuth()
       navigate('/login')

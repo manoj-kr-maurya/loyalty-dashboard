@@ -1,10 +1,24 @@
 import axios, { AxiosError } from 'axios'
+import { getToken } from './auth'
 
-const API_KEY = import.meta.env.VITE_API_KEY || 'gyhewd8x34y87ddsyn9738t94587rfybds09t478fts7ndyr7yfd0gyn7t'
+export const TENANT_API_KEY = (import.meta.env.VITE_API_KEY as string | undefined)?.trim() ?? ''
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:3003',
-  headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY },
+  headers: { 'Content-Type': 'application/json' },
+})
+
+api.interceptors.request.use((config) => {
+  if (TENANT_API_KEY) {
+    config.headers['x-api-key'] = TENANT_API_KEY
+  }
+
+  const token = getToken()
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
+
+  return config
 })
 
 api.interceptors.response.use(

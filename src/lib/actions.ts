@@ -5,11 +5,6 @@ export async function create(currencyCode: string, name: string) {
   return res
 }
 
-export async function addBucketBalance(currencyCode: string, amount: number) {
-  const res = await request('post', '/currency/add-balance-to-organization-currency-bucket', { currencyCode, amount })
-  return res
-}
-
 export async function createCampaign(payload: {
   name: string
   earningPercentage: number

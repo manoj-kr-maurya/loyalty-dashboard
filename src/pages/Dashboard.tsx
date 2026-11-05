@@ -4,7 +4,7 @@ import { setOrg } from '../lib/auth'
 import { useFetch } from '../lib/useFetch'
 import { StatCard } from '../components/StatCard'
 import { StatCardSkeleton, CardSkeleton } from '../components/Skeletons'
-import type { Campaign, CurrencyBucket, Customer, Organization } from '../lib/types'
+import type { Campaign, CurrencyBucket, Organization, TopCustomer } from '../lib/types'
 
 export default function Dashboard() {
   const orgFetch = useFetch<{ organization: Organization }>(async () => {
@@ -14,7 +14,7 @@ export default function Dashboard() {
   })
   const bucketFetch = useFetch<CurrencyBucket[]>(fetchCurrencyBuckets)
   const campaignFetch = useFetch<Campaign[]>(fetchCampaigns)
-  const customerFetch = useFetch<Customer[]>(fetchCustomers)
+  const customerFetch = useFetch<TopCustomer[]>(fetchCustomers)
 
   const org = orgFetch.data?.organization
   const buckets = bucketFetch.data ?? []
@@ -53,7 +53,7 @@ export default function Dashboard() {
         <StatCard to="/currencies" label="Currencies" value={buckets.length} icon={Coins} tone="bg-brand-50 text-brand-600" />
         <StatCard to="/currencies" label="Available Points" value={totalAvailable.toLocaleString()} icon={Wallet} tone="bg-emerald-50 text-emerald-600" />
         <StatCard to="/campaigns" label="Campaigns" value={campaigns.length} icon={Megaphone} tone="bg-amber-50 text-amber-600" />
-        <StatCard to="/customers" label="Customers" value={customers.length} icon={Users} tone="bg-violet-50 text-violet-600" />
+        <StatCard to="/customers" label="Top customers" value={customers.length} icon={Users} tone="bg-violet-50 text-violet-600" />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
